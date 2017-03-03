@@ -15,7 +15,7 @@ type LDAPClient interface {
 
 // Client - the ldap client
 type Client struct {
-	Conn   *ldap.Conn
+	Conn   ldap.Client
 	Config *Config
 }
 
