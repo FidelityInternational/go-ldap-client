@@ -14,7 +14,7 @@ package main
 import (
   "fmt"
   "os"
-  "github.com/FidelityInternation/go-cf-client"
+  "github.com/FidelityInternational/go-ldap-client"
 )
 
 func main() {

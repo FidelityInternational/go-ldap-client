@@ -45,7 +45,7 @@ func New(config *Config) (*Client, error) {
 	if config.UseSSL {
 		tlsConfig := &tls.Config{
 			InsecureSkipVerify: config.InsecureSkipVerify,
-			ServerName:         config.ServerName,
+			ServerName:         config.Host,
 		}
 		if config.ClientCertificates != nil && len(config.ClientCertificates) > 0 {
 			tlsConfig.Certificates = config.ClientCertificates
