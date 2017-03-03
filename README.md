@@ -34,6 +34,7 @@ func main() {
     fmt.Println(err)
     os.Exit(1)
   }
+  defer client.Close()
   authenticated, user, err := client.Authenticate("aUsername", "aPassword")
   if err != nil {
     fmt.Println(err)

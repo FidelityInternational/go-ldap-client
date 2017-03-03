@@ -88,6 +88,7 @@ func (c *Client) Close() {
 
 // Authenticate - authenticates a user against ldap
 func (c *Client) Authenticate(username, password string) (bool, map[string]string, error) {
+	defer c.Bind()
 	attributes := append(c.Config.Attributes, "dn")
 	// Search for the given username
 	searchRequest := ldap.NewSearchRequest(
@@ -120,9 +121,6 @@ func (c *Client) Authenticate(username, password string) (bool, map[string]strin
 	// Bind as the user to verify their password
 	if err := c.Conn.Bind(userDN, password); err != nil {
 		return false, user, err
-	}
-	if err := c.Bind(); err != nil {
-		return true, user, err
 	}
 	return true, user, nil
 }
