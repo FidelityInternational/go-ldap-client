@@ -1,6 +1,7 @@
 package ldapClient_test
 
 import (
+	"crypto/tls"
 	"fmt"
 	. "github.com/FidelityInternational/go-ldap-client"
 	"gopkg.in/ldap.v2"
@@ -53,6 +54,59 @@ func (fc *fakeConn) Search(searchReq *ldap.SearchRequest) (*ldap.SearchResult, e
 }
 
 var _ = Describe("GoLdapClient", func() {
+	Describe("#New", func() {
+		var (
+			config *Config
+			client *Client
+			err    error
+		)
+
+		JustBeforeEach(func() {
+			client, err = New(config)
+		})
+
+		Context("when SSL is set", func() {
+			Context("and connecting to the server fails", func() {
+				BeforeEach(func() {
+					config = &Config{
+						UseSSL:             true,
+						InsecureSkipVerify: true,
+						Host:               "fake.localhost",
+						ClientCertificates: []tls.Certificate{
+							{
+								Certificate: [][]byte{},
+							},
+						},
+						BindDN:       "user",
+						BindPassword: "valid",
+					}
+				})
+
+				It("returns an error", func() {
+					Ω(err).Should(MatchError(`LDAP Result Code 200 "": dial tcp: lookup fake.localhost: no such host`))
+					Ω(client).Should(Equal(&Client{}))
+				})
+			})
+		})
+
+		Context("when SSL is not set", func() {
+			Context("and connecting to the server fails", func() {
+				BeforeEach(func() {
+					config = &Config{
+						UseSSL:       false,
+						BindDN:       "user",
+						BindPassword: "valid",
+					}
+				})
+
+				It("returns an error", func() {
+					Ω(err).Should(MatchError(`LDAP Result Code 200 "": dial tcp :0: connect: can't assign requested address`))
+					Ω(client).Should(Equal(&Client{}))
+				})
+			})
+		})
+	})
+
 	Describe("#Close", func() {
 		It("closes the backend ldap connection", func() {
 			client := Client{
