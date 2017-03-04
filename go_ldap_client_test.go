@@ -83,7 +83,8 @@ var _ = Describe("GoLdapClient", func() {
 				})
 
 				It("returns an error", func() {
-					Ω(err).Should(MatchError(`LDAP Result Code 200 "": dial tcp: lookup fake.localhost: no such host`))
+					Ω(err).ShouldNot(BeNil())
+					Ω(err.Error()).Should(MatchRegexp(".*no such host.*"))
 					Ω(client).Should(Equal(&Client{}))
 				})
 			})
@@ -100,7 +101,8 @@ var _ = Describe("GoLdapClient", func() {
 				})
 
 				It("returns an error", func() {
-					Ω(err).Should(MatchError(`LDAP Result Code 200 "": dial tcp :0: connect: can't assign requested address`))
+					Ω(err).ShouldNot(BeNil())
+					Ω(err.Error()).Should(MatchRegexp(".*can't assign requested address.*"))
 					Ω(client).Should(Equal(&Client{}))
 				})
 			})
