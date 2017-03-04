@@ -1,5 +1,8 @@
 # go-ldap-client
 
+[![codecov.io](https://codecov.io/github/FidelityInternational/go-ldap-client/coverage.svg?branch=master)](https://codecov.io/github/FidelityInternational/go-ldap-client?branch=master)
+[![Go Report Card](https://goreportcard.com/badge/github.com/FidelityInternational/go-ldap-client)](https://goreportcard.com/report/github.com/FidelityInternational/go-ldap-client) [![Build Status](https://travis-ci.org/FidelityInternational/go-ldap-client.svg?branch=master)](https://travis-ci.org/FidelityInternational/go-ldap-client)
+
 A simple [GoLang](https://golang.org) LDAP client for authenticating users.
 
 ### Usage
