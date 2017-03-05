@@ -84,7 +84,7 @@ var _ = Describe("GoLdapClient", func() {
 
 				It("returns an error", func() {
 					Ω(err).ShouldNot(BeNil())
-					Ω(err.Error()).Should(MatchRegexp(".*no such host.*"))
+					Ω(err.Error()).Should(MatchRegexp("LDAP Result Code 200.*"))
 					Ω(client).Should(Equal(&Client{}))
 				})
 			})
@@ -102,7 +102,7 @@ var _ = Describe("GoLdapClient", func() {
 
 				It("returns an error", func() {
 					Ω(err).ShouldNot(BeNil())
-					Ω(err.Error()).Should(MatchRegexp(".*can't assign requested address.*"))
+					Ω(err.Error()).Should(MatchRegexp("LDAP Result Code 200.*"))
 					Ω(client).Should(Equal(&Client{}))
 				})
 			})
