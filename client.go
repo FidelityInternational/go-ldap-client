@@ -32,6 +32,7 @@ type Config struct {
 	InsecureSkipVerify bool
 	UseSSL             bool
 	ClientCertificates []tls.Certificate // Adding client certificates
+	CACertificates     []byte
 }
 
 // New - Creates a new ldap client
@@ -46,6 +47,11 @@ func New(config *Config) (*Client, error) {
 		tlsConfig := &tls.Config{
 			InsecureSkipVerify: config.InsecureSkipVerify,
 			ServerName:         config.Host,
+		}
+		if len(config.CACertificates) > 0 {
+			if !tlsConfig.RootCAs.AppendCertsFromPEM(config.CACertificates) {
+				return &Client{}, fmt.Errorf("Could not append CA certs from PEM")
+			}
 		}
 		if config.ClientCertificates != nil && len(config.ClientCertificates) > 0 {
 			tlsConfig.Certificates = config.ClientCertificates

@@ -66,6 +66,28 @@ var _ = Describe("GoLdapClient", func() {
 		})
 
 		Context("when SSL is set", func() {
+			Context("and the ca cert is invalid", func() {
+				BeforeEach(func() {
+					config = &Config{
+						UseSSL:             true,
+						InsecureSkipVerify: true,
+						Host:               "fake.localhost",
+						ClientCertificates: []tls.Certificate{
+							{
+								Certificate: [][]byte{},
+							},
+						},
+						CACertificates: []byte("a CA Cert"),
+						BindDN:         "user",
+						BindPassword:   "valid",
+					}
+				})
+
+				It("returns an error", func() {
+					Ω(err).Should(MatchError("Could not append CA certs from PEM"))
+					Ω(client).Should(Equal(&Client{}))
+				})
+			})
 			Context("and connecting to the server fails", func() {
 				BeforeEach(func() {
 					config = &Config{
