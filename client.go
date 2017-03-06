@@ -2,6 +2,7 @@ package ldapClient
 
 import (
 	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"gopkg.in/ldap.v2"
 )
@@ -49,6 +50,7 @@ func New(config *Config) (*Client, error) {
 			ServerName:         config.Host,
 		}
 		if len(config.CACertificates) > 0 {
+			tlsConfig.RootCAs = x509.NewCertPool()
 			if !tlsConfig.RootCAs.AppendCertsFromPEM(config.CACertificates) {
 				return &Client{}, fmt.Errorf("Could not append CA certs from PEM")
 			}
