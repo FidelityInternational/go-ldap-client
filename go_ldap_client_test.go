@@ -5,53 +5,60 @@ import (
 	"fmt"
 	. "github.com/FidelityInternational/go-ldap-client"
 	"gopkg.in/ldap.v2"
-	"strings"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/stretchr/testify/mock"
 )
 
 type fakeConn struct {
 	ldap.Conn
+	mock.Mock
 }
 
 func (fc *fakeConn) Close() {}
 
 func (fc *fakeConn) Bind(username, password string) error {
-	if password == "valid" {
-		return nil
-	}
-	return fmt.Errorf("ldap bind failed")
+	args := fc.Called(username, password)
+	return args.Error(0)
 }
 
 func (fc *fakeConn) Search(searchReq *ldap.SearchRequest) (*ldap.SearchResult, error) {
-	if strings.Contains(searchReq.Filter, "failedSearch") {
-		return &ldap.SearchResult{}, fmt.Errorf("failed ldap search")
-	}
-	if strings.Contains(searchReq.Filter, "notExist") {
-		return &ldap.SearchResult{}, nil
-	}
-
-	if strings.Contains(searchReq.Filter, "tooMany") {
-		return &ldap.SearchResult{
-			Entries: []*ldap.Entry{
-				{
-					DN: "dn1",
-				},
-				{
-					DN: "dn2",
-				},
-			},
-		}, nil
-	}
-	return &ldap.SearchResult{
-		Entries: []*ldap.Entry{
-			{
-				DN: "userDn",
-			},
-		},
-	}, nil
+	args := fc.Called(searchReq)
+	return args.Get(0).(*ldap.SearchResult), args.Error(1)
 }
+
+func setFakeConn(bindErr error) *fakeConn {
+	fakeConnection := &fakeConn{}
+	fakeConnection.On("Bind", "magicUser", mock.AnythingOfType("string")).Return(nil)
+	fakeConnection.On("Bind", mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(bindErr)
+	return fakeConnection
+}
+
+func (fc *fakeConn) fakeSearch(searchRes *ldap.SearchResult, err error) {
+	fc.On("Search", mock.AnythingOfType("*ldap.SearchRequest")).Return(searchRes, err)
+}
+
+var singleUser = &ldap.SearchResult{
+	Entries: []*ldap.Entry{
+		{
+			DN: "dn1",
+		},
+	},
+}
+
+var multiUser = &ldap.SearchResult{
+	Entries: []*ldap.Entry{
+		{
+			DN: "dn1",
+		},
+		{
+			DN: "dn1",
+		},
+	},
+}
+
+var noUser = &ldap.SearchResult{}
 
 var _ = Describe("GoLdapClient", func() {
 	Describe("#New", func() {
@@ -78,8 +85,8 @@ var _ = Describe("GoLdapClient", func() {
 							},
 						},
 						CACertificates: []byte("a CA Cert"),
-						BindDN:         "user",
-						BindPassword:   "valid",
+						BindDN:         "username",
+						BindPassword:   "password",
 					}
 				})
 
@@ -88,6 +95,7 @@ var _ = Describe("GoLdapClient", func() {
 					Ω(client).Should(Equal(&Client{}))
 				})
 			})
+
 			Context("and connecting to the server fails", func() {
 				BeforeEach(func() {
 					config = &Config{
@@ -99,8 +107,8 @@ var _ = Describe("GoLdapClient", func() {
 								Certificate: [][]byte{},
 							},
 						},
-						BindDN:       "user",
-						BindPassword: "valid",
+						BindDN:       "username",
+						BindPassword: "password",
 					}
 				})
 
@@ -144,9 +152,10 @@ var _ = Describe("GoLdapClient", func() {
 
 	Describe("#Bind", func() {
 		var (
-			bindDN       string
-			bindPassword string
-			err          error
+			err            error
+			fakeConnection *fakeConn
+			bindDN         = "username"
+			bindPassword   = "password"
 		)
 
 		JustBeforeEach(func() {
@@ -155,20 +164,21 @@ var _ = Describe("GoLdapClient", func() {
 				BindPassword: bindPassword,
 			}
 			client := &Client{
-				Conn:   &fakeConn{},
+				Conn:   fakeConnection,
 				Config: config,
 			}
 			err = client.Bind()
 		})
 
-		Context("when BindDN and BindPassword are set", func() {
-			BeforeEach(func() {
-				bindDN = "bindDN"
-			})
+		AfterEach(func() {
+			bindDN = "username"
+			bindPassword = "password"
+		})
 
+		Context("when BindDN and BindPassword are set", func() {
 			Context("and bind fails", func() {
 				BeforeEach(func() {
-					bindPassword = "invalid"
+					fakeConnection = setFakeConn(fmt.Errorf("ldap bind failed"))
 				})
 
 				It("returns an error", func() {
@@ -178,7 +188,7 @@ var _ = Describe("GoLdapClient", func() {
 
 			Context("and the bind works", func() {
 				BeforeEach(func() {
-					bindPassword = "valid"
+					fakeConnection = setFakeConn(nil)
 				})
 
 				It("does not return an error", func() {
@@ -221,30 +231,31 @@ var _ = Describe("GoLdapClient", func() {
 
 	Describe("#Authenticate", func() {
 		var (
-			authenticated bool
-			user          map[string]string
-			err           error
-			username      string
-			password      string
+			authenticated  bool
+			user           map[string]string
+			err            error
+			bindDN         = "magicUser"
+			bindPassword   = "password"
+			fakeConnection *fakeConn
 		)
 
 		JustBeforeEach(func() {
 			client := &Client{
-				Conn: &fakeConn{},
+				Conn: fakeConnection,
 				Config: &Config{
-					BindDN:       "bindDN",
-					BindPassword: "valid",
+					BindDN:       bindDN,
+					BindPassword: bindPassword,
 					Attributes:   []string{"attribute1"},
 				},
 			}
 			Ω(client.Bind()).Should(BeNil())
-			authenticated, user, err = client.Authenticate(username, password)
+			authenticated, user, err = client.Authenticate("authUsername", "password")
 		})
 
 		Context("and the ldap search fails", func() {
 			BeforeEach(func() {
-				username = "failedSearch"
-				password = "password"
+				fakeConnection = setFakeConn(nil)
+				fakeConnection.fakeSearch(noUser, fmt.Errorf("failed ldap search"))
 			})
 
 			It("returns an error", func() {
@@ -257,8 +268,8 @@ var _ = Describe("GoLdapClient", func() {
 		Context("and the ldap search is successful", func() {
 			Context("and the ldap search returned no results", func() {
 				BeforeEach(func() {
-					username = "notExist"
-					password = "password"
+					fakeConnection = setFakeConn(nil)
+					fakeConnection.fakeSearch(noUser, nil)
 				})
 
 				It("returns an error", func() {
@@ -270,8 +281,8 @@ var _ = Describe("GoLdapClient", func() {
 
 			Context("and the ldap search returned more than 1 results", func() {
 				BeforeEach(func() {
-					username = "tooMany"
-					password = "password"
+					fakeConnection = setFakeConn(nil)
+					fakeConnection.fakeSearch(multiUser, nil)
 				})
 
 				It("returns an error", func() {
@@ -282,13 +293,10 @@ var _ = Describe("GoLdapClient", func() {
 			})
 
 			Context("and the ldap search returned exactly 1 results", func() {
-				BeforeEach(func() {
-					username = "user"
-				})
-
 				Context("and the password is incorrect", func() {
 					BeforeEach(func() {
-						password = "invalid"
+						fakeConnection = setFakeConn(fmt.Errorf("ldap bind failed"))
+						fakeConnection.fakeSearch(singleUser, nil)
 					})
 
 					It("returns an error and the user that was found", func() {
@@ -300,7 +308,8 @@ var _ = Describe("GoLdapClient", func() {
 
 				Context("and the password is correct", func() {
 					BeforeEach(func() {
-						password = "valid"
+						fakeConnection = setFakeConn(nil)
+						fakeConnection.fakeSearch(singleUser, nil)
 					})
 
 					It("returns authenticated true and the user properties", func() {
