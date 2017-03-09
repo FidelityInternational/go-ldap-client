@@ -4,7 +4,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
-	"gopkg.in/ldap.v2"
+	"github.com/go-ldap/ldap"
 )
 
 // LDAPClient - the ldap client interface

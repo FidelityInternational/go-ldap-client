@@ -4,7 +4,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	. "github.com/FidelityInternational/go-ldap-client"
-	"gopkg.in/ldap.v2"
+	"github.com/go-ldap/ldap"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
