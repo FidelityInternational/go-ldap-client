@@ -16,8 +16,9 @@ type LDAPClient interface {
 
 // Client - the ldap client
 type Client struct {
-	Conn   ldap.Client
-	Config *Config
+	Conn        ldap.Client
+	Config      *Config
+	disconnects int
 }
 
 // Config - ldap client config
@@ -38,49 +39,67 @@ type Config struct {
 
 // New - Creates a new ldap client
 func New(config *Config) (*Client, error) {
-	var (
-		ldapConn *ldap.Conn
-		err      error
-	)
-
-	address := fmt.Sprintf("%s:%d", config.Host, config.Port)
-	if config.UseSSL {
-		tlsConfig := &tls.Config{
-			InsecureSkipVerify: config.InsecureSkipVerify,
-			ServerName:         config.Host,
-		}
-		if len(config.CACertificates) > 0 {
-			tlsConfig.RootCAs = x509.NewCertPool()
-			if !tlsConfig.RootCAs.AppendCertsFromPEM(config.CACertificates) {
-				return &Client{}, fmt.Errorf("Could not append CA certs from PEM")
-			}
-		}
-		if config.ClientCertificates != nil && len(config.ClientCertificates) > 0 {
-			tlsConfig.Certificates = config.ClientCertificates
-		}
-		ldapConn, err = ldap.DialTLS("tcp", address, tlsConfig)
-		if err != nil {
-			return &Client{}, err
-		}
-	} else {
-		ldapConn, err = ldap.Dial("tcp", address)
-		if err != nil {
-			return &Client{}, err
-		}
+	client := &Client{Config: config}
+	if err := client.connect(); err != nil {
+		return &Client{}, err
 	}
-	client := &Client{Conn: ldapConn, Config: config}
 	if err := client.Bind(); err != nil {
 		return &Client{}, err
 	}
 	return client, nil
 }
 
+func (c *Client) connect() error {
+	var (
+		ldapConn *ldap.Conn
+		err      error
+	)
+	c.Close()
+	address := fmt.Sprintf("%s:%d", c.Config.Host, c.Config.Port)
+	if c.Config.UseSSL {
+		tlsConfig := &tls.Config{
+			InsecureSkipVerify: c.Config.InsecureSkipVerify,
+			ServerName:         c.Config.Host,
+		}
+		if len(c.Config.CACertificates) > 0 {
+			tlsConfig.RootCAs = x509.NewCertPool()
+			if !tlsConfig.RootCAs.AppendCertsFromPEM(c.Config.CACertificates) {
+				return fmt.Errorf("Could not append CA certs from PEM")
+			}
+		}
+		if c.Config.ClientCertificates != nil && len(c.Config.ClientCertificates) > 0 {
+			tlsConfig.Certificates = c.Config.ClientCertificates
+		}
+		ldapConn, err = ldap.DialTLS("tcp", address, tlsConfig)
+		if err != nil {
+			return err
+		}
+	} else {
+		ldapConn, err = ldap.Dial("tcp", address)
+		if err != nil {
+			return err
+		}
+	}
+	c.Conn = ldapConn
+	return nil
+}
+
 // Bind - bind to LDAP as the Config user
 func (c *Client) Bind() error {
 	if c.Config.BindDN != "" && c.Config.BindPassword != "" {
 		if err := c.Conn.Bind(c.Config.BindDN, c.Config.BindPassword); err != nil {
+			if err.Error() == "ldap: connection closed" {
+				c.disconnects++
+				if c.disconnects < 2 {
+					if err := c.connect(); err != nil {
+						return err
+					}
+					return c.Bind()
+				}
+			}
 			return err
 		}
+		c.disconnects = 0
 		return nil
 	}
 	return fmt.Errorf("BindDN or BindPassword was not set on Client config")
@@ -97,6 +116,9 @@ func (c *Client) Close() {
 // Authenticate - authenticates a user against ldap
 func (c *Client) Authenticate(username, password string) (bool, map[string]string, error) {
 	defer c.Bind()
+	if err := c.Bind(); err != nil {
+		return false, nil, err
+	}
 	attributes := append(c.Config.Attributes, "dn")
 	// Search for the given username
 	searchRequest := ldap.NewSearchRequest(
