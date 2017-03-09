@@ -88,7 +88,7 @@ func (c *Client) connect() error {
 func (c *Client) Bind() error {
 	if c.Config.BindDN != "" && c.Config.BindPassword != "" {
 		if err := c.Conn.Bind(c.Config.BindDN, c.Config.BindPassword); err != nil {
-			if err.Error() == "ldap: connection closed" {
+			if err.Error() == `LDAP Result Code 200 "Network Error": ldap: connection closed` {
 				c.disconnects++
 				if c.disconnects < 2 {
 					if err := c.connect(); err != nil {
