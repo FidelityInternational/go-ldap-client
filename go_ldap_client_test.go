@@ -3,8 +3,9 @@ package ldapClient_test
 import (
 	"crypto/tls"
 	"fmt"
+
 	. "github.com/FidelityInternational/go-ldap-client"
-	"github.com/go-ldap/ldap"
+	"github.com/go-ldap/ldap/v3"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
